@@ -1,23 +1,25 @@
 const mongoose = require("mongoose");
 
 const commentSchema = new mongoose.Schema({
-  user: {
+  nickname: {
     type: String,
-    required: true,
-  },
-  password: {
-    type: Number,
-    required: true,
   },
   content: {
     type: String,
     required: true,
   },
-  postId: {
-    type: String
-  },
   day: {
     type: Date
+  },
+  update: {
+    type: Date
+  },
+  userId: {
+    type: String,
+    required: true,
+  },
+  postId: {
+    type: String,
   }
 });
 

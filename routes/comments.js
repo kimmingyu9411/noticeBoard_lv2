@@ -2,96 +2,77 @@ const express = require('express');
 const router = express.Router();
 const Post = require("../schemas/post.js");
 const Comment = require("../schemas/comment.js");
+const User = require("../schemas/user");
+const loginMiddleware = require("../middlewares/login-middleware")
 
-//db의 댓글 목록 불러오기//
 router.get("/posts/:id/comments", async (req, res) => {
     postId = req.params.id
-    //게시판 아이디가 일치하는지 확인//
     const comments = await Comment.find({ postId })
-    //일치한다면 if구문 일치하지 않는다면 else//
     if (comments.length) {
         const commentList = comments.map((comment) => {
-            //db의 오브젝트 아이디를 문자열로 변환//
             commentId = String(comment._id)
             return {
                 "commentId": commentId,
-                "user": comment.user,
+                "postId": comment.postId,
+                "nickname": comment.nickname,
                 "content": comment.content,
                 "day": comment.day,
+                "update": comment.update
             }
-        })
+        });
         res.send({ commentList })
     } else { return res.status(400).json({ message: "데이터 형식을 확인해주세요" }) }
 });
 
-//댓글 형성//
-router.post("/posts/:id/comments", async (req, res) => {
+
+router.post("/posts/:id/comments", loginMiddleware, async (req, res) => {
     postId = req.params.id;
-    //게시판의 id가 유효한 id인지 확인//
-    const chkId = Post.find({ _id: Object(postId) })
-    if (chkId) { console.log("게시판 특정 완료.") } else { return res.status(400).json({ message: "데이터형식을 확인해주세요" }) }
-    //body에서 데이터 받음//
-    const { content, user, password } = req.body;
-    //작성 시간 설정//
+    const { userId } = res.locals.user;
+    const { content } = req.body;
     const day = new Date();
-    //중복 아이디 확인 있다면 else로 없다면 if 구문//
-    const existsUser = await Comment.find({ user });
-    if (existsUser.length === 0) {
-        //데이터를 작성했는지 확인//
-        if (user) {
-            //데이터를 작성했는지 확인//
-            if (content) {
-                //데이터를 작성했는지 확인//
-                if (password) {
-                    //데이터를 작성했는지 확인//
-                    await Comment.create({ content, user, password, day, postId });
-                    res.json({ message: "댓글을 생성하였습니다." })
-                } else { return res.status(400).json({ message: "데이터형식을 확인해주세요" }) }
-            } else { return res.status(400).json({ message: "데이터형식을 확인해주세요" }) }
-        } else { return res.status(400).json({ message: "데이터형식을 확인해주세요" }) }
-    } else { return res.status(400).json({ message: "이미 존재하는 user입니다." }) }
-}
-);
+    const update = new Date();
+    const [existsUser] = await User.find({ _id: Object(userId) })
+    const existsPost = await Post.find({ userId, _id: Object(postId) });
+    const nickname = existsUser.nickname
+    if (!existsPost) {
+        res.status(403).json({ message: '전달된 쿠키에서 오류가 발생하였습니다.' })
+        return
+    }
 
-//댓글 데이터 수정//
-router.put("/posts/:id/comments/:commentId", async (req, res) => {
+    if (!content) {
+        res.status(412).json({ message: '댓글 내용의 형식이 일치하지 않습니다.' })
+        return
+    }
+    else {
+        await Comment.create({ content, day, update, userId, nickname, postId });
+        res.status(201).json({ massage: "댓글을 생성하였습니다." });
+    }
+});
+
+router.put("/posts/:id/comments/:commentId", loginMiddleware, async (req, res) => {
     commentId = req.params.commentId;
-    //body에서 데이터 받음//
-    const { content, password } = req.body;
-    //url의 title이 있는지 확인//
-    const [existsComment] = await Comment.find({ _id: Object(commentId) });
+    const { userId } = res.locals.user;
+    const { content } = req.body;
 
-    if (existsComment) {
-        //데이터를 작성했는지 확인//
-        if (content) {
-            //비밀번호를 제대로 작성했는지 확인//
-            if (existsComment.password != password) {
-                return res.status(400).json({ message: "데이터형식을 확인해주세요" })
-            } else {
-                await Comment.updateOne({ _id: Object(commentId) }, { $set: { content } })
-            }
-        } else { return res.status(400).json({ message: "데이터형식을 확인해주세요" }) }
-    } else { return res.status(400).json({ message: "게시글 조회에 실패했습니다." }) }
-    res.json({ message: "게시글을 수정하였습니다." })
-
-})
+    const [existsComment] = await Comment.find({ userId, _id: Object(commentId) });
+    if (!existsComment) {
+        res.status(412).json({ message: '댓글 내용의 형식이 일치하지 않습니다.' })
+        return
+    } else { await Comment.updateOne({ userId }, { $set: { content } }) }
+    res.status(201).json({ message: "댓글을 수정하였습니다." })
+});
 
 //게시글 삭제//
-router.delete("/posts/:id/comments/:commentId", async (req, res) => {
+router.delete("/posts/:id/comments/:commentId", loginMiddleware, async (req, res) => {
     commentId = req.params.commentId;
-    //body에서 데이터 받음//
-    const { password } = req.body;
-    //url의 title이 있는지 확인//
-    const [existsComment] = await Comment.find({ _id: Object(commentId) });
+    const { userId } = res.locals.user;
+    const [existsComment] = await Comment.find({ userId, _id: Object(commentId) });
 
-    //url의 title이 없다면 else로 있다면 if구문//
-    if (existsComment) {
-        //비밀번호를 제대로 작성했는지 확인//
-        if (existsComment.password != password) {
-            return res.status(400).json({ message: "데이터형식을 확인해주세요" })
-        } else { await Comment.deleteOne({ _id: Object(commentId) }) }
-    } else { return res.status(400).json({ message: "게시글 조회에 실패했습니다." }) }
-    res.json({ message: "게시글을 삭제해였습니다." });
+    if (!existsComment) {
+        return res.status(400).json({ message: "삭제권한이 없습니다." })
+    } else { await Comment.deleteOne({ userId}) } 
+
+    res.status(201).json({ message: "게시글을 삭제해였습니다." })
 });
 
 module.exports = router;

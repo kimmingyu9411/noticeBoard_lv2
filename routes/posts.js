@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const Post = require("../schemas/post.js");
-const loginMiddleware = require("../middlewares/login-middleware");
+const loginMiddleware = require("../middlewares/login-middleware")
 
 
 //db의 게시글 전체 목록 불러오기//
 router.get("/posts", async (req, res) => {
-  const posts = await Post.find({})
+  const posts = await Post.find({}).sort({ day: -1 })
   //db의 게시글 데이터 중 표출 데이터 선정//
   const postList = posts.map((post) => {
     //db의 오브젝트 아이디를 문자열로 변환//
@@ -28,86 +28,94 @@ router.get("/posts/:id", async (req, res) => {
   //id가 같은 데이터를 서치//
   const [existsPost] = await Post.find({ _id: Object(id) });
   //id와 같은 데이터가 없다면 else로 있다면 if구문//
-  if ([existsPost].length) {
+  if (!existsPost) {
+    return res.status(400).json({ message: "게시글 조회에 실패했습니다." })
+  } else {
     const searchReslut = [existsPost].map((search) => {
       return {
         "postId": id,
+        "userId": search.userId,
         "title": search.title,
         "content": search.content,
-        "user": search.user,
-        "day": search.day
+        "day": search.day,
+        "update": search.update
       }
     })
     res.json({ searchReslut });
-  } else { return res.status(400).json({ message: "데이터형식을 확인해주세요" }) }
+  }
 
 });
 
 //게시글 형성//
-router.post("/posts",loginMiddleware, async (req, res) => {
+router.post("/posts", loginMiddleware, async (req, res) => {
+  const { userId } = res.locals.user;
   //body에서 데이터 받음//
-  const { title, content, user, password } = req.body;
+  const { title, content } = req.body;
   //작성 시간 설정//
   const day = new Date();
-  //중복 아이디 확인 있다면 else로 없다면 if 구문//
-  const existsUser = await Post.find({ user });
-  if (existsUser.length === 0) {
-    //데이터를 작성했는지 확인//
-    if (title) {
-      //데이터를 작성했는지 확인//
-      if (content) {
-        //데이터를 작성했는지 확인//
-        if (user) {
-          //데이터를 작성했는지 확인//
-          if (password) {
-            await Post.create({ title, content, user, password, day });
-            res.json({ message: "게시판을 생성하였습니다." })
-          } else { return res.status(400).json({ message: "데이터형식을 확인해주세요" }) }
-        } else { return res.status(400).json({ message: "데이터형식을 확인해주세요" }) }
-      } else { return res.status(400).json({ message: "데이터형식을 확인해주세요" }) }
-    } else { return res.status(400).json({ message: "데이터형식을 확인해주세요" }) }
-  } else { return res.status(400).json({ message: "이미 존재하는 user입니다." }) }
-}
-);
+  const update = new Date();
+  const existsUser = await Post.find({ userId });
+
+  if (!existsUser) {
+    res.status(403).json({ message: '전달된 쿠키에서 오류가 발생하였습니다.' })
+    return
+  }
+
+  if (!title && !content) {
+    res.status(412).json({ message: '데이터 형식이 올바르지 않습니다.' });
+    return
+  }
+  if (!title) {
+    res.status(412).json({ message: '게시글 제목의 형식이 일치하지 않습니다.' })
+    return
+  }
+
+  if (!content) {
+    res.status(412).json({ message: '게시글 내용의 형식이 일치하지 않습니다.' })
+    return
+  }
+  else {
+    await Post.create({ title, content, day, userId, update });
+    res.status(200).json({ massage: "게시글을 생성하였습니다." });
+  }
+});
+
 
 //게시글 데이터 수정//
-router.put("/posts/:id",loginMiddleware, async (req, res) => {
+router.put("/posts/:id", loginMiddleware, async (req, res) => {
   id = req.params.id;
-  //body에서 데이터 받음//
-  const { content, password } = req.body;
-  //url의 title이 있는지 확인//
-  const [existsPost] = await Post.find({ _id: Object(id) });
+  const { title, content } = req.body;
+  const { userId } = res.locals.user;
+  const update = new Date();
+  const [existsPost] = await Post.find({ userId,_id: Object(id)});
+  if (!title) {
+    res.status(412).json({ message: '게시글 제목의 형식이 일치하지 않습니다.' })
+    return
+  }
 
-  //url의 title이 존재한다면 if구문 없다면 else로//
-  if (existsPost) {
-    //데이터를 작성했는지 확인//
-    if (content) {
-      //비밀번호를 제대로 작성했는지 확인//
-      if (existsPost.password != password) {
-        return res.status(400).json({ message: "데이터형식을 확인해주세요" })
-      } else {
-        await Post.updateOne({ _id: Object(id) }, { $set: { content } })
-      }
-    } else { return res.status(400).json({ message: "데이터형식을 확인해주세요" }) }
-  } else { return res.status(400).json({ message: "게시글 조회에 실패했습니다." }) }
-  res.json({ message: "게시글을 수정하였습니다." })
+  if (!content) {
+    res.status(412).json({ message: '게시글 내용의 형식이 일치하지 않습니다.' })
+    return
+  }
+
+  if (!existsPost) {
+    return res.status(412).json({ message: "게시글을 수정할 권한이 존재하지 않습니다." })
+  } else {
+    await Post.updateOne({ userId }, { $set: { update } })
+    await Post.updateOne({ userId }, { $set: { content } });
+    await Post.updateOne({ userId }, { $set: { title } });
+    res.json({ message: "게시글을 수정하였습니다." })
+  }
 })
 
 //게시글 삭제//
-router.delete("/posts/:id",loginMiddleware, async (req, res) => {
-  id = req.params.id;
-  //body에서 데이터 받음//
-  const { password } = req.body;
-  //url의 title이 있는지 확인//
-  const [existsPost] = await Post.find({ _id: Object(id) });
+router.delete("/posts/:id", loginMiddleware, async (req, res) => {
+  const { userId } = res.locals.user;
+  const [existsPost] = await Post.find({ userId });
 
-  //url의 title이 없다면 else로 있다면 if구문//
-  if (existsPost) {
-    //비밀번호를 제대로 작성했는지 확인//
-    if (existsPost.password != password) {
-      return res.status(400).json({ message: "데이터형식을 확인해주세요" })
-    } else { await Post.deleteOne({ _id: Object(id) }) }
-  } else { return res.status(400).json({ message: "게시글 조회에 실패했습니다." }) }
+  if (!existsPost) {
+    return res.status(412).json({ message: "게시글을 삭제할 권한이 존재하지 않습니다." })
+  } else { await Post.deleteOne({ userId }) }
   res.json({ message: "게시글을 삭제해였습니다." });
 })
 

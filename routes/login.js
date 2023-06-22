@@ -4,14 +4,15 @@ const User = require("../schemas/user");
 const jwt = require("jsonwebtoken");
 
 
+
 //로그인API
 router.post("/login", async (req, res) => {
     const {Id, password } = req.body;
 
-    //이메일이 일치하는 유저를 찾는다.
+    //아이디가 일치하는 유저를 찾는다.
     const user = await User.findOne({ Id });
 
-    //1.이메일에 일치하는 유저가 존재하지 않거나
+    //1.아이디가 일치하는 유저가 존재하지 않거나
     //2.유저를 찾았지만 유저의 비밀번호와 입력한 비밀번호가 다를 때
     if (!user || user.password !== password) {
         res.status(400).json({

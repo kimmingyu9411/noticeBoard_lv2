@@ -35,7 +35,7 @@ router.post("/signup", async (req, res) => {
     const user = new User({ Id, nickname, password });
     await user.save();
 
-    res.status(201).json({});
+    res.status(201).json({Message: "회원가입에 성공했습니다."});
 });
 
 
