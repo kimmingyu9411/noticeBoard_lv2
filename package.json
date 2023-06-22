@@ -1,0 +1,25 @@
+{
+  "name": "noticeboard",
+  "version": "1.0.0",
+  "description": "make notice board",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/kimmingyu9411/notice_board.git"
+  },
+  "author": "kimmingyu",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kimmingyu9411/notice_board/issues"
+  },
+  "homepage": "https://github.com/kimmingyu9411/notice_board#readme",
+  "dependencies": {
+    "cookie-parser": "^1.4.6",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.0",
+    "mongoose": "^7.2.4"
+  }
+}
